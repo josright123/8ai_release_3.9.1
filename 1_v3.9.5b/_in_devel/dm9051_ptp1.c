@@ -26,7 +26,7 @@
 //#include <linux/ptp_classify.h>
 
 //#include "dm9051_ptp1.h"
-#include "dm9051.h"
+#include "../dm9051.h"
 //#include "dm9051_ptpd.h"
 #define DMCONF_DIV_HLPR_32 //(32-bit division helper, __aeabi_ldivmod())
 
@@ -124,11 +124,13 @@ u8 get_ptp_message_type005(struct ptp_header *ptp_hdr) {
 	return ptp_hdr->tsmt & 0x0f;
 }
 
-void dm9051_ptp_tx_in_progress(struct sk_buff *skb)
+int dm9051_ptp_tx_in_progress(struct sk_buff *skb)
 {
 	if (skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
 		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+		return 1;
 	}
+	return 0;
 }
 
 void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb)
@@ -478,7 +480,7 @@ void ptp_init_rcr(struct board_info *db) {
 	db->rctl.rcr_all = RCR_DIS_LONG | RCR_RXEN; //_15888_ //Disable discard CRC error (work around)
 }
 u8 ptp_status_bits(struct board_info *db) {
-	return RSR_ERR_BITS & ~RSR_PTP_BITS
+	return RSR_ERR_BITS & ~RSR_PTP_BITS;
 //	u8 err_bits = RSR_ERR_BITS;
 
 //	if (db->ptp_enable) {

@@ -115,7 +115,7 @@ static void SHOW_ALL_USER_CONFIG(struct device *dev, struct board_info *db)
 	#endif
 }
 
-static void on_core_init(struct board_info *db)
+static void on_core_init_show(struct board_info *db)
 {
 	netif_crit(db, hw, db->ndev, "dm9051.on.(all_start(open), all_upstart(link_chg), all_restart(err_fnd))\n");
 }
@@ -749,6 +749,7 @@ static int dm9051_core_init(struct board_info *db)
 		return ret;
 
 /* core init (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) -open ptpc */
+	on_core_init_show(db);
 	DMPLUG_PTP_AT_RATE(db);
 
 	return ret; /* ~return dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db)) */

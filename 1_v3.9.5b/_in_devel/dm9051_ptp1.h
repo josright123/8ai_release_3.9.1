@@ -121,11 +121,11 @@ void on_core_init_ptp_rate(struct board_info *db);
 
 /* ptp2 */
 int dm9051_read_ptp_tstamp_mem(struct board_info *db);
-void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb, u8 *rxTSbyte);
+void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb);
 void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb);
 void dm9051_ptp_rxc_from_master(struct board_info *db);
 
-void dm9051_ptp_tx_in_progress(struct sk_buff *skb);
+int dm9051_ptp_tx_in_progress(struct sk_buff *skb);
 void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb);
 void dm9051_ptp_txreq_hwtstamp(struct board_info *db, struct sk_buff *skb);
 
@@ -151,7 +151,7 @@ void dm9051_ptp_txreq_hwtstamp(struct board_info *db, struct sk_buff *skb);
 #undef DMPLUG_PTP_TS_INFO
 #define DMPLUG_PTP_TS_INFO(s)	s = dm9051_ptp_netdev_ioctl,
 #undef DMPLUG_PTP_AT_RATE
-#define DMPLUG_PTP_AT_RATE(b)	on_core_init_ptp_rate(db)
+#define DMPLUG_PTP_AT_RATE(b)	on_core_init_ptp_rate(b)
 
 #undef DMPLUG_RX_TS_MEM
 #define DMPLUG_RX_TS_MEM(b)		dm9051_read_ptp_tstamp_mem(b)

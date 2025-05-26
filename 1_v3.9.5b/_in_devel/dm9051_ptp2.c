@@ -23,7 +23,7 @@
 #include <linux/version.h>
 
 //#include "dm9051_ptp1.h"
-#include "dm9051.h"
+#include "../dm9051.h"
 //#include "dm9051_ptpd.h"
 
 int ptp_9051_adjfine(struct ptp_clock_info *caps, long scaled_ppm)
@@ -467,9 +467,8 @@ static void dm9051_ptp_tx_hwtstamp(struct board_info *db, struct sk_buff *skb)
 #endif
 }
 
-void on_core_init_ptp_rate(struct board_info *db) //v.s. .on_core_init' (also cause by)
+void on_core_init_ptp_rate(struct board_info *db)
 {
-	netif_crit(db, hw, db->ndev, "dm9051.on.(all_start(open), all_upstart(link_chg), all_restart(err_fnd))\n");
 	if (db->ptp_on) { /* all_start, all_upstart, all_restart */
 		u32 rate_reg = dm9051_get_rate_reg(db); //15888, dm9051_get_rate_reg(db);
 		netif_warn(db, hw, db->ndev, "dm9051.on.Pre-RateReg value = 0x%08X\n", rate_reg);
@@ -524,11 +523,11 @@ static u64 rx_extract_ts(u8 *rxTSbyte)
 	ns |= ns_hi  << 16;
 
 	ns += ((u64)sec) * 1000000000ULL;
-	//printk("dm9051_ptp_rx_hwtstamp ns_lo=%x, ns_hi=%x s_lo=%x s_hi=%x \r\n", ns_lo, ns_hi, s_lo, s_hi);
+	//printk("_dm9051_ptp_rx_hwtstamp ns_lo=%x, ns_hi=%x s_lo=%x s_hi=%x \r\n", ns_lo, ns_hi, s_lo, s_hi);
 	return ns;
 }
 
-void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb, u8 *rxTSbyte)
+void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb)
 {
 #if 0 //[wait further test..]
 		if (is_ptp_rxts_enable(db)) //if T1/T4, // Is it inserted Timestamp?
@@ -537,7 +536,7 @@ void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb, u8 *rxTS
 			//So when NOT T1/T4, we can skip tell tstamp (just an empty (virtual) one)
 
 			#if 0
-			= original.dm9051_ptp_rx_hwtstamp(db, skb, db->rxTSbyte); //_15888_, 
+			= original.dm9051_ptp_rx_hwtstamp(db, skb /*, db->rxTSbyte*/); //_15888_, 
 			#endif
 			/* following, with netif_rx(skb),
 			 * slave4l can parse the T1 and/or T4 rx tstamp from master
@@ -547,7 +546,7 @@ void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb, u8 *rxTS
 				/* Since we cannot turn off the Rx timestamp logic if the device is
 				 * doing Tx timestamping, check if Rx timestamping is configured.
 				 */
-				u64 ns = rx_extract_ts(rxTSbyte);
+				u64 ns = rx_extract_ts(db->rxTSbyte);
 				do {
 					struct skb_shared_hwtstamps *shhwtstamps =
 						skb_hwtstamps(skb); //for pass T2 the HW rx tstamp

@@ -71,7 +71,7 @@
 #warning "INT: TWO_STEP"
 #endif
 
-//#define PLUG_PTP_1588
+#define PLUG_PTP_1588
 #ifdef PLUG_PTP_1588
 #define DMPLUG_PTP //(ptp 1588)
 
@@ -119,12 +119,13 @@
 /* Extended support header files
  */
 
-/* FAK1, */
-#define FAK1 //(fake1)
-
-//[fak1.ptp]
+/* , */
+//[FAK1.ptp]
+/* FAK1 ptpc */
+#define FAK1
 #if defined(FAK1) && (defined(SECOND_MAIN) || defined(MAIN_DATA))
-/* fake ptpc */
+#endif
+
 #define DMPLUG_PTP_VER(b)
 #define PTP_NEW(d)				0
 #define PTP_INIT_RCR(d)
@@ -133,7 +134,7 @@
 #define DMPLUG_PTP_INFO(s)
 #define GET_RSR_BITS(b)			RSR_ERR_BITS
 #define DMPLUG_PTP_TS_INFO(s)
-#define DMPLUG_PTP_AT_RATE(b)	on_core_init(b)
+#define DMPLUG_PTP_AT_RATE(b)
 
 #define DMPLUG_RX_TS_MEM(b)		0
 #define DMPLUG_RX_HW_TS_SKB(b,s)
@@ -143,10 +144,9 @@
 #define DMPLUG_PTP_TX_IN_PROGRESS(s)	0
 #define DMPLUG_PTP_TX_PRE(b,s)
 #define DMPLUG_TX_EMIT_TS(b,s)
-#endif
 
 #if defined(DMPLUG_PTP)
-#include "dm9051_ptp1.h" /* 0.1 ptpc */
+#include "_in_devel/dm9051_ptp1.h" /* 0.1 ptpc */
 #endif
 
 //#include "dm9051_plug.h" /* '_INT_TWO_STEP' definition insided */
