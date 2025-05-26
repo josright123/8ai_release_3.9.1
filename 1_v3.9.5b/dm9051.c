@@ -627,7 +627,7 @@ static int dm9051_phy_reset(struct board_info *db)
 	int ret;
 
 	/* PHY reset */
-	printk("_phy_reset\n");
+	printk("_phy_reset: [internal] mdio phywr %d %04x\n", 0, 0x8000); //netif_info(db, link, db->ndev, ..
 
 	ret = dm9051_phywrite(db, 0, 0x8000);
 	if (ret)
@@ -695,7 +695,7 @@ static int dm9051_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
 		/* [dbg] mdio.wr BMCR */
 		do {
 			/* NOT next with k for dm9051_phywr(regnum, val) */
-			if ((regnum == 0) && (val & 0x800)) {
+			if ((regnum == 0) && (val & BIT(11))) { //BIT(11) = 0x800
 				netif_crit(db, link, db->ndev, "[mdio phywr] %d %04x: power down (warn)\n", regnum, val);
 				break;
 			}
@@ -1210,6 +1210,7 @@ static int dm9051_all_stop(struct board_info *db)
 	if (ret)
 		return ret;
 
+	printk("_phy_power_down: [internal] mdio phywr %d %04x\n", 0, 0x3900); //netif_info(db, link, db->ndev, ..
 	netif_crit(db, hw, db->ndev, "netif_crit IsExtra-phy-power-down-redundent!?\n");
 	ret = dm9051_phywrite(db, 0, 0x3900);
 	if (ret)
@@ -1243,7 +1244,8 @@ static int dm9051_all_restart(struct board_info *db) //todo
  */
 int dm9051_all_upfcr(struct board_info *db)
 {
-	netif_crit(db, rx_err, db->ndev, "DMCONF_MRR_WR operation not applied!\n");
+	netif_crit(db, link, db->ndev, "DMCONF_MRR_WR operation not applied!\n");
+	netif_crit(db, link, db->ndev, "So does (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) not applied!\n");
 	return dm9051_update_fcr(db);
 }
 //#ifdef DMCONF_MRR_WR
@@ -1433,7 +1435,7 @@ static int rx_head_break(struct board_info *db)
 	//#ifdef DMPLUG_PTP
 	//err_bits = ptp_status_bits(db);
 	//#endif
-	u8 err_bits = GET_RSR_BITS(db); /* 7 rxhead ptpc */
+	u8 err_bits = GET_RSR_BITS(db); /* 7 rxhead ptpc, when REG60H.D[0]=0, PTP Function enable, or REG61H.D[0]=1, and D[1]=0, then re-defined RSR */
 
 	rxlen = le16_to_cpu(db->rxhdr.rxlen);
 	if (db->rxhdr.status & err_bits || rxlen > DM9051_PKT_MAX)
