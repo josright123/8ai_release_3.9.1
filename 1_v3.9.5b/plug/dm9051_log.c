@@ -72,13 +72,9 @@ void show_dev_begin(struct device *dev, struct board_info *db) //.SHOW_DEVLOG_RE
 
 	/* conti */
 	tx_conti_ver(db);
+
 	/* 2.0 ptpc */
-	#ifdef DMPLUG_PTP
-	if (db->ptp_enable) {
-		dev_info(&db->spidev->dev, "DMPLUG PTP Version\n");
-		dev_info(&db->spidev->dev, "Enable PTP must COERCE to disable checksum_offload\n");
-	}
-	#endif
+	DMPLUG_PTP_VER(db);
 }
 
 void show_log(struct board_info *db) //.SHOW_LOG_REFER_BEGIN

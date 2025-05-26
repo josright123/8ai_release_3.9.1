@@ -125,6 +125,7 @@
 //[fak1.ptp]
 #if defined(FAK1) && (defined(SECOND_MAIN) || defined(MAIN_DATA))
 /* fake ptpc */
+#define DMPLUG_PTP_VER(b)
 #define PTP_NEW(d)				0
 #define PTP_INIT_RCR(d)
 #define PTP_INIT(d)
@@ -133,14 +134,23 @@
 #define GET_RSR_BITS(b)			RSR_ERR_BITS
 #define DMPLUG_PTP_TS_INFO(s)
 #define DMPLUG_PTP_AT_RATE(b)	on_core_init(b)
+
+#define DMPLUG_RX_TS_MEM(b)		0
+#define DMPLUG_RX_HW_TS_SKB(b,s)
+#define SHOW_ptp_rx_packet_monitor(b,s)
+#define DMPLUG_NOT_CLIENT_DISPLAY_RXC_FROM_MASTER(b)
+
+#define DMPLUG_PTP_TX_IN_PROGRESS(s)	0
+#define DMPLUG_PTP_TX_PRE(b,s)
+#define DMPLUG_TX_EMIT_TS(b,s)
 #endif
 
 #if defined(DMPLUG_PTP)
-#include "dm9051_ptp1.h"
+#include "dm9051_ptp1.h" /* 0.1 ptpc */
 #endif
 
 //#include "dm9051_plug.h" /* '_INT_TWO_STEP' definition insided */
-//#include "dm9051_ptpd.h" /* 0.1 ptpc */
+//#include "dm9051_ptpd.h"
 
 /* Device identification
  */
@@ -476,7 +486,6 @@ struct board_info
 	unsigned int mdi; //= 0x0830;
 
 	/* 1 ptpc */
-	#if 1 //0
 	#ifdef DMPLUG_PTP
 	int			ptp_enable;
 	struct ptp_clock        *ptp_clock;
@@ -490,7 +499,6 @@ struct board_info
 	struct hwtstamp_config	tstamp_config;
 	s64			pre_rate;
 	u8              	rxTSbyte[8]; //_15888_ // Store 1588 Time Stamp
-	#endif
 	#endif
 };
 

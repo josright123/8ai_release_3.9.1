@@ -1474,17 +1474,8 @@ static int rx_head_break(struct board_info *db)
 		return 1;
 	}
 
-	#ifdef DMPLUG_PTP
-	do {
 	/* -rxhead ptpc */
-	/* show that received ptp packets, while ptp_on, but ptp4l still NOT ran.
-	 */
-	//	static int before_slave_ptp_packets = 5;
-	//	if (before_slave_ptp_packets && (!db->ptp_on) && (db->rxhdr.status & RSR_PTP_BITS)) {
-	//		netif_warn(db, hw, db->ndev, "%d. On ptp_on is 0, ptp packet received!\n", before_slave_ptp_packets--);
-	//	}
-	} while(0);
-	#endif
+	DMPLUG_NOT_CLIENT_DISPLAY_RXC_FROM_MASTER(db);
 	return 0;
 }
 
@@ -1548,16 +1539,12 @@ int dm9051_loop_rx(struct board_info *db)
 			dm9051_all_restart(db);
 			return -EINVAL;
 		}
-		
-		/* 7.1 ptpc */
-		#if 1 //0
-		#ifdef DMPLUG_PTP
+
 		/* receive rx_tstamp */
-		ret = dm9051_read_ptp_tstamp_mem(db, db->rxTSbyte);
+		/* 7.1 ptpc */
+		ret = DMPLUG_RX_TS_MEM(db);
 		if (ret)
 			return ret;
-		#endif
-		#endif
 
 		rxlen = le16_to_cpu(db->rxhdr.rxlen);
 		padlen = (plat_cnf->skb_wb_mode && (rxlen & 1)) ? rxlen + 1 : rxlen;
@@ -1580,30 +1567,12 @@ int dm9051_loop_rx(struct board_info *db)
 		}
 
 		/* 7.2dbg ptpc */
-		#if 1 //0
-		#ifdef DMPLUG_PTP
-		dm9051_ptp_rx_packet_monitor(db, skb);
-		#endif
-		#endif
+		SHOW_ptp_rx_packet_monitor(db, skb);
 
 		skb->protocol = eth_type_trans(skb, db->ndev);
 
 		/* 7.2 ptpc */
-		#if 1 //0
-		#ifdef DMPLUG_PTP
-#if 0 //[wait further test..]
-		if (is_ptp_rxts_enable(db)) //if T1/T4, // Is it inserted Timestamp?
-#endif
-		//So when NOT T1/T4, we can skip tell tstamp (just an empty (virtual) one)
-		//if (db->rxhdr.status & RSR_RXTS_EN) {	// Is it inserted Timestamp?
-			dm9051_ptp_rx_hwtstamp(db, skb, db->rxTSbyte); //_15888_, 
-			/* following, with netif_rx(skb),
-			 * slave4l can parse the T1 and/or T4 rx tstamp from master
-			 */
-		//}
-
-		#endif
-		#endif
+		DMPLUG_RX_HW_TS_SKB(db,skb);
 
 		if (ndev->features & NETIF_F_RXCSUM)
 			skb_checksum_none_assert(skb);
@@ -1729,23 +1698,17 @@ int TX_SENDC(struct board_info *db, struct sk_buff *skb)
 #endif
 #endif
 
-	/* 6 tx ptpc */
-	#ifdef DMPLUG_PTP
-#if 1 //tom tell, 20250522
-	if (skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) {
-		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
+	/* 6.0 tx ptpc */
+	if (DMPLUG_PTP_TX_IN_PROGRESS(skb)) //tom tell, 20250522
 		netdev_dbg(db->ndev, "Yes, This is a hardware timestamp requested\n");
-	}
-#endif	
-	dm9051_ptp_txreq(db, skb);
-	#endif
+
+	/* 6 tx ptpc */
+	DMPLUG_PTP_TX_PRE(db, skb);
 
 	ret = TX_SEND(db, skb);
 
 	/* 6.1 tx ptpc */
-	#ifdef DMPLUG_PTP
-	dm9051_ptp_txreq_hwtstamp(db, skb);
-	#endif
+	DMPLUG_TX_EMIT_TS(db, skb);
 
 #if defined(STICK_SKB_CHG_NOTE)
 	dev_kfree_skb(skb);
