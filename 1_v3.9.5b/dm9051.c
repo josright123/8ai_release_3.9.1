@@ -29,7 +29,9 @@ const struct plat_cnf_info *plat_cnf = &plat_align_mode; /* Driver configuration
 /* Tx 'wb' do skb protect */
 #define DM9051_SKB_PROTECT
 #define STICK_SKB_CHG_NOTE
+
 #define DM9051_INTR_BACKUP // #ifdef DM9051_INTR_BACKUP .. #endif //instead more backup.
+#define DM9051_NORM_BACKUP_TX // 
 
 int get_dts_irqf(struct board_info *db)
 {
@@ -920,6 +922,15 @@ static int dm9051_map_chipid(struct board_info *db)
 	return SHOW_MAP_CHIPID(dev, wid);
 }
 
+static void dm90951_get_random(struct net_device *ndev, u8 *addr)
+{
+		eth_hw_addr_random(ndev);
+		ether_addr_copy(addr, ndev->dev_addr);
+		addr[0] = 0x00;
+		addr[1] = 0x60;
+		addr[2] = 0x6e;
+}
+
 /* Read DM9051_PAR registers which is the mac address loaded from EEPROM while power-on
  */
 static int dm9051_map_etherdev_par(struct net_device *ndev, struct board_info *db)
@@ -933,12 +944,7 @@ static int dm9051_map_etherdev_par(struct net_device *ndev, struct board_info *d
 
 	if (!is_valid_ether_addr(addr))
 	{
-		eth_hw_addr_random(ndev);
-
-		ether_addr_copy(addr, ndev->dev_addr);
-		addr[0] = 0x00;
-		addr[1] = 0x60;
-		addr[2] = 0x6e;
+		dm90951_get_random(ndev, addr);
 
 		ret = dm9051_set_regs(db, DM9051_PAR, addr, sizeof(addr));
 		if (ret < 0)
@@ -1233,22 +1239,23 @@ int dm9051_all_upfcr(struct board_info *db)
 	return dm9051_update_fcr(db);
 }
 //#ifdef DMCONF_MRR_WR
-int dm9051_all_upstart001(struct board_info *db) //todo
-{
-	int ret;
+//int dm9051_all_upstart001(struct board_info *db) //todo
+//{
+//	int ret;
 
-	printk("_all_upstart\n"); //NOT to .netif_crit(db, rx_err, db->ndev, "_all_upstart\n");
+//	printk("_all_upstart\n"); //NOT .netif_crit();
 
-	ret = dm9051_ncr_reset(db);
-	if (ret)
-		return ret;
+//	ret = dm9051_ncr_reset(db);
+//	if (ret)
+//		return ret;
 
-	ret = dm9051_all_reinit(db); //up_restart
-	if (ret)
-		return ret;
+//	ret = dm9051_all_reinit(db); //up_restart
+//	if (ret)
+//		return ret;
 
-	return 0;
-}
+//	return 0;
+//}
+//#endif //DMCONF_MRR_WR
 int dm9051_all_upstart(struct board_info *db)
 {
 	int ret;
@@ -1285,7 +1292,6 @@ dnf_end:
 	netif_crit(db, rx_err, db->ndev, "DMCONF_MRR_WR operation done!\n");
 	return ret;
 }
-//#endif //DMCONF_MRR_WR
 
 /* all reinit while rx error found
  */
@@ -1365,8 +1371,6 @@ static int trap_rxb(struct board_info *db, unsigned int *prxbyte)
 			char head[HEAD_LOG_BUFSIZE];
 			sprintf(head, "rxb 1st %d", db->bc.evaluate_rxb_counter);
 			DMPLUG_LOG_RXPTR(head, db);
-			//dm9051_headlog_regs(head, db, DM9051_MRRL, DM9051_MRRH);
-			//dm9051_headlog_regs(head, db, 0x24, 0x25);
 		}
 
 		n += sprintf(pbff + n, "_[eval_rxb %2d]", db->bc.evaluate_rxb_counter);
@@ -1405,29 +1409,23 @@ static int rx_break(struct board_info *db, unsigned int rxbyte, netdev_features_
 			if (((SCAN_BH(rxbyte) & 0x03) == DM9051_PKT_RDY)) {	\
 				return 0;	\
 			} else {	\
-				netif_warn(db, rx_status, db->ndev, "YES checksum check\n"); return -EINVAL;	\
+				netif_warn(db, rx_status, db->ndev, "Oops checksum check\n"); return -EINVAL;	\
 			}	\
 		} while(0);
 	}
 	else
 		DM9051_RX_BREAK((SCAN_BH(rxbyte) == DM9051_PKT_RDY), return 0,
-			/*k("NO checksum check\n");*/ return -EINVAL);
+			return -EINVAL);
 }
 
 static int rx_head_break(struct board_info *db)
 {
-	//struct net_device *ndev = db->ndev;
 	int rxlen;
-
-	u8 err_bits = RSR_ERR_BITS;
-	
-	/* 7 rxhead ptpc */
-	#if 1 //0
-	#ifdef DMPLUG_PTP
-//	static int before_slave_ptp_packets = 5;
-	err_bits = ptp_status_bits(db);
-	#endif
-	#endif
+	//u8 err_bits = RSR_ERR_BITS;
+	//#ifdef DMPLUG_PTP
+	//err_bits = ptp_status_bits(db);
+	//#endif
+	u8 err_bits = GET_RSR_BITS(db); /* 7 rxhead ptpc */
 
 	rxlen = le16_to_cpu(db->rxhdr.rxlen);
 	if (db->rxhdr.status & err_bits || rxlen > DM9051_PKT_MAX)
@@ -1466,16 +1464,19 @@ static int rx_head_break(struct board_info *db)
 		return 1;
 	}
 
-	/* -rxhead ptpc */
 	#ifdef DMPLUG_PTP
-//	if (before_slave_ptp_packets && (!db->ptp_on) && (db->rxhdr.status & RSR_PTP_BITS)) {
-//		netif_warn(db, hw, db->ndev, "%d. On ptp_on is 0, ptp packet received!\n", before_slave_ptp_packets--);
-//	}
+	do {
+	/* -rxhead ptpc */
+	/* show that received ptp packets, while ptp_on, but ptp4l still NOT ran.
+	 */
+	//	static int before_slave_ptp_packets = 5;
+	//	if (before_slave_ptp_packets && (!db->ptp_on) && (db->rxhdr.status & RSR_PTP_BITS)) {
+	//		netif_warn(db, hw, db->ndev, "%d. On ptp_on is 0, ptp packet received!\n", before_slave_ptp_packets--);
+	//	}
+	} while(0);
 	#endif
 	return 0;
 }
-
-static int dm9051_loop_tx(struct board_info *db);
 
 /* read packets from the fifo memory
  * return value,
@@ -1520,8 +1521,6 @@ int dm9051_loop_rx(struct board_info *db)
 		{
 			if (trap_rxb(db, &rxbyte)) {
 				DMPLUG_LOG_RXPTR("rxb last", db);
-				//dm9051_headlog_regs("rxb last", db, DM9051_MRRL, DM9051_MRRH);
-				//dm9051_headlog_regs("rxb last", db, 0x24, 0x25);
 				dm9051_all_restart(db);
 				return -EINVAL;
 			}
@@ -1626,7 +1625,7 @@ int dm9051_loop_rx(struct board_info *db)
 	return scanrr;
 }
 
-#if !defined(_DMPLUG_CONTI)
+#if defined(DM9051_NORM_BACKUP_TX) // -#if !defined(_DMPLUG_CONTI) -#endif
 #ifdef DM9051_SKB_PROTECT
 static struct sk_buff *EXPAND_SKB(struct sk_buff *skb, unsigned int pad)
 {	
@@ -1752,7 +1751,7 @@ int TX_SENDC(struct board_info *db, struct sk_buff *skb)
 	return ret;
 }
 
-static int dm9051_loop_tx(struct board_info *db)
+int dm9051_loop_tx(struct board_info *db)
 {
 	struct net_device *ndev = db->ndev;
 	int ntx = 0;
@@ -1983,7 +1982,7 @@ static int dm9051_all_stop_mlock(struct board_info *db)
 	return ret;
 }
 
-#if defined(DMPLUG_INT)
+#if defined(DM9051_INTR_BACKUP) // -#if defined(DMPLUG_INT) -#endif
 /*
  * Interrupt: 
  */
@@ -2290,12 +2289,10 @@ static const struct net_device_ops dm9051_netdev_ops = {
 	.ndo_set_features = dm9051_ndo_set_features,
 	.ndo_get_stats = dm9051_get_stats,
 	/* 5 ptpc */
-#if defined(DMPLUG_PTP)
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(5,10,11)
-	.ndo_do_ioctl = dm9051_ptp_netdev_ioctl, //_15888_
+	DMPLUG_PTP_TS_INFO(.ndo_do_ioctl) //.ndo_do_ioctl = dm9051_ptp_netdev_ioctl, //_15888_
 #else
-	.ndo_eth_ioctl = dm9051_ptp_netdev_ioctl, //_15888_
-#endif
+	DMPLUG_PTP_TS_INFO(.ndo_eth_ioctl) //.ndo_eth_ioctl = dm9051_ptp_netdev_ioctl, //_15888_
 #endif
 };
 

@@ -250,6 +250,9 @@ static void show_log_regs(char *head, struct board_info *db, unsigned int reg1, 
 	snprintf(db->bc.head, HEAD_LOG_BUFSIZE - 1, head);
 	dm9051_dump_reg2s(db, reg1, reg2);
 }
+/*dm9051_headlog_regs(DM9051_MRRL, DM9051_MRRH);
+ *dm9051_headlog_regs(0x24, 0x25);
+ */
 void dm9051_log_rxptr(char *head, struct board_info *db)
 {
 	show_log_regs(head, db, DM9051_MRRL, DM9051_MRRH);

@@ -131,15 +131,19 @@ void ptp_end(struct board_info *db);
 /* re-direct ptpc */
 #if defined(CO1) && defined(DMPLUG_PTP) && (defined(SECOND_MAIN) || defined(MAIN_DATA))
 #undef PTP_NEW
-#define PTP_NEW(d) ptp_new(d)
+#define PTP_NEW(d) 				ptp_new(d)
 #undef PTP_INIT_RCR
-#define PTP_INIT_RCR(d) ptp_init_rcr(d)
+#define PTP_INIT_RCR(d) 		ptp_init_rcr(d)
 #undef PTP_INIT
-#define PTP_INIT(d) ptp_init(d)
+#define PTP_INIT(d) 			ptp_init(d)
 #undef PTP_END
-#define PTP_END(d) ptp_end(d)
+#define PTP_END(d) 				ptp_end(d)
 #undef DMPLUG_PTP_INFO
-#define DMPLUG_PTP_INFO(s)	s = dm9051_ts_info,
+#define DMPLUG_PTP_INFO(s)		s = dm9051_ts_info,
+#undef GET_RSR_BITS
+#define GET_RSR_BITS(b)			ptp_status_bits(db)
+#undef DMPLUG_PTP_TS_INFO
+#define DMPLUG_PTP_TS_INFO(s)	s = dm9051_ptp_netdev_ioctl,
 #endif
 #endif
 

@@ -130,6 +130,8 @@
 #define PTP_INIT(d)
 #define PTP_END(d)
 #define DMPLUG_PTP_INFO(s)
+#define GET_RSR_BITS(b)		RSR_ERR_BITS
+#define DMPLUG_PTP_TS_INFO(s)
 #endif
 
 #if defined(DMPLUG_PTP)
@@ -513,6 +515,7 @@ int dm9051_subconcl_and_rerxctrl(struct board_info *db);
 
 /* operation functions */
 int dm9051_loop_rx(struct board_info *db);
+int dm9051_loop_tx(struct board_info *db);
 void dm9051_thread_irq(void *pw); //(int voidirq, void *pw)
 irqreturn_t dm9051_rx_threaded_plat(int voidirq, void *pw);
 int dm9051_ncr_poll(struct board_info *db);

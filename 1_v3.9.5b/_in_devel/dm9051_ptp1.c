@@ -661,12 +661,13 @@ void ptp_init_rcr(struct board_info *db) {
 	db->rctl.rcr_all = RCR_DIS_LONG | RCR_RXEN; //_15888_ //Disable discard CRC error (work around)
 }
 u8 ptp_status_bits(struct board_info *db) {
-	u8 err_bits = RSR_ERR_BITS;
+	return RSR_ERR_BITS & ~RSR_PTP_BITS
+//	u8 err_bits = RSR_ERR_BITS;
 
-	if (db->ptp_enable) {
-		err_bits &= ~RSR_PTP_BITS; //_15888_ //To allow support "Enable PTP" must disable checksum_offload
-	}
-	return err_bits;
+//	if (db->ptp_enable) {
+//		err_bits &= ~RSR_PTP_BITS; //_15888_ //To allow support "Enable PTP" must disable checksum_offload
+//	}
+//	return err_bits;
 }
 int is_ptp_rxts_enable(struct board_info *db) {
 	return (db->rxhdr.status & RSR_RXTS_EN) ? 1 : 0; //if T1/T4, // Is it inserted Timestamp?
