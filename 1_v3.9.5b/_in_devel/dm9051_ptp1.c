@@ -669,6 +669,16 @@ u8 ptp_status_bits(struct board_info *db) {
 //	}
 //	return err_bits;
 }
+
+void on_core_init_ptp_rate(struct board_info *db) //v.s. .on_core_init' (also cause by)
+{
+	netif_crit(db, hw, db->ndev, "dm9051.on.(all_start(open), all_upstart(link_chg), all_restart(err_fnd))\n");
+	if (db->ptp_on) { /* all_start, all_upstart, all_restart */
+		u32 rate_reg = dm9051_get_rate_reg(db); //15888, dm9051_get_rate_reg(db);
+		netif_warn(db, hw, db->ndev, "dm9051.on.Pre-RateReg value = 0x%08X\n", rate_reg);
+	}
+}
+
 int is_ptp_rxts_enable(struct board_info *db) {
 	return (db->rxhdr.status & RSR_RXTS_EN) ? 1 : 0; //if T1/T4, // Is it inserted Timestamp?
 }

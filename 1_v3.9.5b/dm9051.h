@@ -125,13 +125,14 @@
 //[fak1.ptp]
 #if defined(FAK1) && (defined(SECOND_MAIN) || defined(MAIN_DATA))
 /* fake ptpc */
-#define PTP_NEW(d)			0
+#define PTP_NEW(d)				0
 #define PTP_INIT_RCR(d)
 #define PTP_INIT(d)
 #define PTP_END(d)
 #define DMPLUG_PTP_INFO(s)
-#define GET_RSR_BITS(b)		RSR_ERR_BITS
+#define GET_RSR_BITS(b)			RSR_ERR_BITS
 #define DMPLUG_PTP_TS_INFO(s)
+#define DMPLUG_PTP_AT_RATE(b)	on_core_init(b)
 #endif
 
 #if defined(DMPLUG_PTP)

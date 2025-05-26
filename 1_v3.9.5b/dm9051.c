@@ -115,6 +115,11 @@ static void SHOW_ALL_USER_CONFIG(struct device *dev, struct board_info *db)
 	#endif
 }
 
+static void on_core_init(struct board_info *db)
+{
+	netif_crit(db, hw, db->ndev, "dm9051.on.(all_start(open), all_upstart(link_chg), all_restart(err_fnd))\n");
+}
+
 static void SHOW_OPEN(struct board_info *db)
 {
 	printk("\n");
@@ -742,6 +747,9 @@ static int dm9051_core_init(struct board_info *db)
 	ret = INT_CLOCK(db); /* clock out */
 	if (ret)
 		return ret;
+
+/* core init (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) -open ptpc */
+	DMPLUG_PTP_AT_RATE(db);
 
 	return ret; /* ~return dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db)) */
 }
@@ -1925,16 +1933,6 @@ static int dm9051_all_start_init(struct board_info *db)
 	ret = dm9051_all_start(db);
 	if (ret)
 		return ret;
-
-	/* -open ptpc */
-	#if 1 //0
-	#ifdef DMPLUG_PTP
-	if (db->ptp_on) {
-		u32 rate_reg = dm9051_get_rate_reg(db); //15888, dm9051_get_rate_reg(db);
-		netif_warn(db, hw, db->ndev, "Pre-RateReg value = 0x%08X\n", rate_reg);
-	}
-	#endif
-	#endif
 
 	#if MI_FIX
 	mutex_unlock(&db->spi_lockm);

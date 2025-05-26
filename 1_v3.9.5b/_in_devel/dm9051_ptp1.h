@@ -106,24 +106,26 @@ int dm9051_ts_info(struct net_device *net_dev, struct ethtool_ts_info *info); //
 /* netdev_ops
  */
 int dm9051_ptp_netdev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd);
-void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb);
-int dm9051_read_ptp_tstamp_mem(struct board_info *db, u8 *rxTSbyte);
-void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb, u8 *rxTSbyte);
-void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb);
-void dm9051_ptp_txreq_hwtstamp(struct board_info *db, struct sk_buff *skb);
-u32 dm9051_get_rate_reg(struct board_info *db);
-
-void dm9051_ptp_tx_hwtstamp(struct board_info *db, struct sk_buff *skb);
 
 //implement in ptpd
 //static void dm9051_ptp_core_init(struct board_info *db);
 
 int ptp_new(struct board_info *db);
 void ptp_init_rcr(struct board_info *db);
-u8 ptp_status_bits(struct board_info *db);
 int is_ptp_rxts_enable(struct board_info *db);
 void ptp_init(struct board_info *db);
 void ptp_end(struct board_info *db);
+u8 ptp_status_bits(struct board_info *db);
+void on_core_init_ptp_rate(struct board_info *db);
+
+/* ptp2 */
+void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb);
+int dm9051_read_ptp_tstamp_mem(struct board_info *db, u8 *rxTSbyte);
+void dm9051_ptp_rx_hwtstamp(struct board_info *db, struct sk_buff *skb, u8 *rxTSbyte);
+void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb);
+void dm9051_ptp_txreq_hwtstamp(struct board_info *db, struct sk_buff *skb);
+u32 dm9051_get_rate_reg(struct board_info *db);
+void dm9051_ptp_tx_hwtstamp(struct board_info *db, struct sk_buff *skb);
 
 /* CO1, */
 #define CO1 //(Coerce)
@@ -144,6 +146,8 @@ void ptp_end(struct board_info *db);
 #define GET_RSR_BITS(b)			ptp_status_bits(db)
 #undef DMPLUG_PTP_TS_INFO
 #define DMPLUG_PTP_TS_INFO(s)	s = dm9051_ptp_netdev_ioctl,
+#undef DMPLUG_PTP_AT_RATE
+#define DMPLUG_PTP_AT_RATE(b)	on_core_init_ptp_rate(db)
 #endif
 #endif
 
