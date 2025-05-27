@@ -87,7 +87,7 @@ static int SHOW_MAP_CHIPID(struct device *dev, unsigned short wid)
 	return 0;
 }
 
-static void on_core_init_show(struct board_info *db)
+static void on_core_reset_show(struct board_info *db)
 {
 	netif_crit(db, hw, db->ndev, "dm9051.on.(all_start(open), all_upstart(link_chg), all_restart(err_fnd))\n");
 }
@@ -684,7 +684,7 @@ static int dm9051_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
 
 /* Functions: Core init
  */
-static int dm9051_core_init(struct board_info *db)
+static int dm9051_core_reset(struct board_info *db)
 {
 	int ret = BUS_SETUP(db); /* customization */
 	if (ret)
@@ -715,10 +715,19 @@ static int dm9051_core_init(struct board_info *db)
 	if (ret)
 		return ret;
 
-	on_core_init_show(db); /* core init (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) -open ptpc */
+	on_core_reset_show(db); /* core init (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) -open ptpc */
 	DMPLUG_PTP_AT_RATE(db);
 
 	return ret; /* ~return dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db)) */
+}
+
+static int dm9051_all_start_intr(struct board_info *db)
+{
+	int ret = dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db));
+	if (ret)
+		return ret;
+
+	return dm9051_enable_interrupt(db);
 }
 
 static void dm9051_reg_lock_mutex(void *dbcontext)
@@ -1159,7 +1168,7 @@ static int dm9051_all_start(struct board_info *db)
 	if (ret)
 		return ret;
 
-	return dm9051_core_init(db);
+	return dm9051_core_reset(db);
 }
 
 static int dm9051_all_stop(struct board_info *db)
@@ -1198,6 +1207,7 @@ static int dm9051_all_restart(struct board_info *db) //todo
 	ret = dm9051_phy_reset(db);
 	if (ret)
 		return ret;
+
 	ret = dm9051_all_reinit(db); //head_restart
 	if (ret)
 		return ret;
@@ -1248,15 +1258,12 @@ int dm9051_all_upstart(struct board_info *db)
 		
 	//=	ret = dm9051_all_reinit(db); //up_restart
 	#if 1		
-		ret = dm9051_core_init(db);
+		ret = dm9051_core_reset(db);
 		if (ret)
 			goto dnf_end;
 	#endif
-		ret = dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db));
-		if (ret)
-			goto dnf_end;
 
-		ret = dm9051_enable_interrupt(db);
+		ret = dm9051_all_start_intr(db);
 		if (ret)
 			goto dnf_end;
 
@@ -1280,7 +1287,7 @@ int dm9051_all_reinit(struct board_info *db)
 //	phy_stop(db->phydev);
 //	mutex_lock(&db->spi_lockm);
 
-	ret = dm9051_core_init(db);
+	ret = dm9051_core_reset(db);
 	if (ret)
 		return ret;
 
@@ -1289,11 +1296,7 @@ int dm9051_all_reinit(struct board_info *db)
 //	phy_start_aneg(db->phydev);
 //	mutex_lock(&db->spi_lockm);
 
-	ret = dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db));
-	if (ret)
-		return ret;
-
-	ret = dm9051_enable_interrupt(db);
+	ret = dm9051_all_start_intr(db);
 	if (ret)
 		return ret;
 
@@ -1772,7 +1775,7 @@ static void dm9051_tx_delay(struct work_struct *work)
 #if 1
 //static void dm9051_rx_xplat_enable(struct board_info *db)
 //{
-//	dm9051_enable_interrupt(db);
+//	_dm9051_enable_interrupt(db);
 //}
 //static void dm9051_rx_xplat_loop(struct board_info *db)
 //{
@@ -1781,7 +1784,7 @@ static void dm9051_tx_delay(struct work_struct *work)
 //.	ret =
 //.	if (ret < 0)
 //.		return;
-//	dm9051_enable_interrupt(db); //"dm9051_rx_xplat_enable(struct board_info *db)"
+//	_dm9051_enable_interrupt(db); //"dm9051_rx_xplat_enable(struct board_info *db)"
 //}
 
 //static int dm9051_rx_xplat_disable(struct board_info *db)
@@ -1870,28 +1873,6 @@ static int dm9051_all_start_init(struct board_info *db)
 	mutex_unlock(&db->spi_lockm);
 	#endif
 
-	return ret;
-}
-
-static int dm9051_all_start_intr(struct board_info *db)
-{
-	int ret;
-
-	#if MI_FIX
-	mutex_lock(&db->spi_lockm);//.open's
-	#endif
-
-	ret = dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db));
-	if (ret)
-		goto intr_unlck;
-
-	ret = dm9051_enable_interrupt(db);
-
-intr_unlck:
-	#if MI_FIX
-	mutex_unlock(&db->spi_lockm);
-	#endif
-	
 	return ret;
 }
 
@@ -2020,7 +2001,17 @@ static int dm9051_open(struct net_device *ndev)
 		return ret;
 	}
 
+
+	#if MI_FIX
+	mutex_lock(&db->spi_lockm);//.open's
+	#endif
+
 	ret = dm9051_all_start_intr(db); /* near the bottom */
+
+	#if MI_FIX
+	mutex_unlock(&db->spi_lockm);
+	#endif
+
 	if (ret) {
 		phy_stop(db->phydev);
 		dm9051_free_irqworks(db);
