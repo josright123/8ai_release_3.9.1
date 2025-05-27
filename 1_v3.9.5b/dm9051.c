@@ -44,6 +44,14 @@ int get_dts_irqf(struct board_info *db)
 	return IRQF_TRIGGER_LOW;
 }
 
+void USER_CONFIG(struct device *dev, struct board_info *db, char *str)
+{
+	if (dev)
+		dev_warn(dev, "%s\n", str);
+	else if (db)
+		netif_info(db, drv, db->ndev, "%s\n", str);
+}
+
 static unsigned int dm9051_init_intcr_value(struct board_info *db)
 {
 	return (get_dts_irqf(db) == IRQF_TRIGGER_LOW || get_dts_irqf(db) == IRQF_TRIGGER_FALLING) ? INTCR_POL_LOW : INTCR_POL_HIGH;
@@ -64,55 +72,19 @@ static int SHOW_MAP_CHIPID(struct device *dev, unsigned short wid)
 	return 0;
 }
 
-static void USER_CONFIG(struct device *dev, struct board_info *db, char *str)
-{
-	if (dev)
-		dev_warn(dev, "%s\n", str);
-	else if (db)
-		netif_info(db, drv, db->ndev, "%s\n", str);
-}
-
 static void SHOW_ALL_USER_CONFIG(struct device *dev, struct board_info *db)
 {
-	#if (defined(__x86_64__) || defined(__aarch64__)) && defined(MAIN_DATA)
-	USER_CONFIG(dev, db, "dm9051 __aarch64__");
-	#ifndef CONFIG_64BIT // 64-bit specific code
-	USER_CONFIG(dev, db, "dm9051 CONFIG_32BIT (kconfig) ?!");
-	#endif
-	#elif (!defined(__x86_64__) && !defined(__aarch64__)) && defined(MAIN_DATA)
-	USER_CONFIG(dev, db, "dm9051 __aarch32__");
-	#ifdef CONFIG_64BIT // 64-bit specific code
-	USER_CONFIG(dev, db, "dm9051 CONFIG_64BIT(kconfig) ?!");
-	#endif
-	#endif //__x86_64__ || __aarch64__
+	INFO_CPU_BITS(dev, db);
+	INFO_CPU_MIS_CONF(dev, db);
 
-	#if defined(DMPLUG_INT)
-	USER_CONFIG(dev, db, "dm9051 INT");
-	#endif
-	#if !defined(DMPLUG_INT)
-	USER_CONFIG(dev, db, "dm9051 POL");
-	#endif
-	#if defined(INT_CLKOUT)
-	USER_CONFIG(dev, db, "INT: INT_CLKOUT");
-	#endif
-	#if defined(INT_TWO_STEP)
-	USER_CONFIG(dev, db, "INT: TWO_STEP");
-	#endif
-	#if defined(DMCONF_BMCR_WR)
-	USER_CONFIG(dev, db, "WORKROUND: BMCR_WR");
-	#endif
-	#if defined(DMCONF_MRR_WR)
-	USER_CONFIG(dev, db, "WORKROUND: MRR_WR");
-	#endif
-	#if defined(DMPLUG_CONTI)
-	USER_CONFIG(dev, db, "dm9051 CONTI");
-	#endif
-	#if defined(DMPLUG_PTP)
-	USER_CONFIG(dev, db, "dm9051 PTP");
-	#endif
-	#if defined(DMPLUG_PPS_CLKOUT)
-	USER_CONFIG(dev, db, "dm9051 PPS");
-	#endif
+	INFO_INT(dev, db);
+	INFO_INT_CLKOUT(dev, db);
+	INFO_INT_TWOSTEP(dev, db);
+	INFO_BMCR_WR(dev, db);
+	INFO_MRR_WR(dev, db);
+	INFO_CONTI(dev, db);
+	INFO_PTP(dev, db);
+	INFO_PPS(dev, db);
 }
 
 static void on_core_init_show(struct board_info *db)
@@ -1955,7 +1927,7 @@ static int dm9051_req_irq(struct board_info *db, irq_handler_t handler)
 	struct spi_device *spi = db->spidev;
 	int ret;
 
-	netif_warn(db, intr, db->ndev, "request_irq(INT_THREAD)\n");
+	netif_warn(db, intr, db->ndev, "request_irq(INT MODE)\n");
 	thread_servicep_re_enter = 0; //used in 'dm9051_rx_threaded_plat'
 	ret = request_threaded_irq(spi->irq, NULL, handler, //'dm9051_rx_threaded_plat'
 							   get_dts_irqf(db) | IRQF_ONESHOT,
