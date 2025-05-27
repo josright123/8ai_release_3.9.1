@@ -721,15 +721,6 @@ static int dm9051_core_reset(struct board_info *db)
 	return ret; /* ~return dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db)) */
 }
 
-static int dm9051_all_start_intr(struct board_info *db)
-{
-	int ret = dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db));
-	if (ret)
-		return ret;
-
-	return dm9051_enable_interrupt(db);
-}
-
 static void dm9051_reg_lock_mutex(void *dbcontext)
 {
 	struct board_info *db = dbcontext;
@@ -1221,6 +1212,42 @@ static int dm9051_all_stop(struct board_info *db)
 	return dm9051_set_reg(db, DM9051_RCR, RCR_RX_DISABLE);
 }
 
+static int dm9051_all_start_mlock(struct board_info *db)
+{
+	int ret;
+
+	#if MI_FIX
+	mutex_lock(&db->spi_lockm); //.open
+	#endif
+
+	ret = dm9051_all_start(db);
+	if (ret)
+		return ret;
+
+	#if MI_FIX
+	mutex_unlock(&db->spi_lockm);
+	#endif
+
+	return ret;
+}
+
+static int dm9051_all_stop_mlock(struct board_info *db)
+{
+	int ret;
+
+	#if MI_FIX
+	mutex_lock(&db->spi_lockm);
+	#endif
+
+	ret = dm9051_all_stop(db);
+
+	#if MI_FIX
+	mutex_unlock(&db->spi_lockm);
+	#endif
+
+	return ret;
+}
+
 /* fifo reset while rx error found
  */
 static int dm9051_all_restart(struct board_info *db) //todo
@@ -1256,13 +1283,6 @@ static int dm9051_all_restart(struct board_info *db) //todo
 
 /* to re-write while link change up
  */
-int dm9051_all_upfcr(struct board_info *db)
-{
-	netif_crit(db, link, db->ndev, "DMCONF_MRR_WR operation not applied!\n");
-	netif_crit(db, link, db->ndev, "So does (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) not applied!\n");
-	return dm9051_update_fcr(db);
-}
-
 int dm9051_all_upstart(struct board_info *db)
 {
 	int ret;
@@ -1292,6 +1312,22 @@ int dm9051_all_upstart(struct board_info *db)
 dnf_end:
 	netif_crit(db, rx_err, db->ndev, "DMCONF_MRR_WR operation done!\n");
 	return ret;
+}
+
+int dm9051_all_upfcr(struct board_info *db)
+{
+	netif_crit(db, link, db->ndev, "DMCONF_MRR_WR operation not applied!\n");
+	netif_crit(db, link, db->ndev, "So does (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) not applied!\n");
+	return dm9051_update_fcr(db);
+}
+
+int dm9051_all_start_intr(struct board_info *db)
+{
+	int ret = dm9051_set_reg(db, DM9051_INTCR, dm9051_init_intcr_value(db));
+	if (ret)
+		return ret;
+
+	return dm9051_enable_interrupt(db);
 }
 
 int dm9051_subconcl_and_rerxctrl(struct board_info *db)
@@ -1850,42 +1886,6 @@ irqreturn_t dm9051_rx_threaded_plat(int voidirq, void *pw)
 }
 #endif
 
-static int dm9051_all_start_init(struct board_info *db)
-{
-	int ret;
-
-	#if MI_FIX
-	mutex_lock(&db->spi_lockm); //.open
-	#endif
-
-	ret = dm9051_all_start(db);
-	if (ret)
-		return ret;
-
-	#if MI_FIX
-	mutex_unlock(&db->spi_lockm);
-	#endif
-
-	return ret;
-}
-
-static int dm9051_all_stop_mlock(struct board_info *db)
-{
-	int ret;
-
-	#if MI_FIX
-	mutex_lock(&db->spi_lockm);
-	#endif
-
-	ret = dm9051_all_stop(db);
-
-	#if MI_FIX
-	mutex_unlock(&db->spi_lockm);
-	#endif
-
-	return ret;
-}
-
 #if defined(DM9051_INTR_BACKUP) // -#if defined(DMPLUG_INT) -#endif
 /*
  * Interrupt: 
@@ -1971,7 +1971,7 @@ static int dm9051_open(struct net_device *ndev)
 
 	ndev->irq = spi->irq; /* by dts */
 
-	ret = dm9051_all_start_init(db); /* such as all start */
+	ret = dm9051_all_start_mlock(db); /* such as all start */
 	if (ret)
 		return ret;
 
