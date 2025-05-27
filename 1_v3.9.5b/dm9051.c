@@ -1374,13 +1374,15 @@ static int rx_break(struct board_info *db, unsigned int rxbyte, netdev_features_
 	if (features & NETIF_F_RXCSUM)
 	{
 		//DM9051_RX_BREAK(((SCAN_BH(rxbyte) & 0x03) == DM9051_PKT_RDY), return 0, 
-		//	netif_warn(db, rx_status, db->ndev, "YES checksum check\n"); return -EINVAL);
+		//	netif_warn(db, rx_status, db->ndev, "YES checksum check\n"); 
+		//	return -EINVAL);
 		
 		do {	\
 			if (((SCAN_BH(rxbyte) & 0x03) == DM9051_PKT_RDY)) {	\
 				return 0;	\
 			} else {	\
-				netif_warn(db, rx_status, db->ndev, "Oops checksum check\n"); return -EINVAL;	\
+				netif_warn(db, rx_status, db->ndev, "Oops checksum check\n"); \
+				return -EINVAL;	\
 			}	\
 		} while(0);
 	}
@@ -1653,8 +1655,8 @@ int TX_SENDC(struct board_info *db, struct sk_buff *skb)
 {
 	int ret;
 
-#if !defined(DMPLUG_CONTI)
 #if defined(STICK_SKB_CHG_NOTE)
+#if !defined(DMPLUG_CONTI)
 	skb = dm9051_pad_txreq(db, skb);
 #endif
 #endif
