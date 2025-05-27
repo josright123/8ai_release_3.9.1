@@ -100,7 +100,7 @@ static void SHOW_OPEN(struct board_info *db)
 	/* amdix_log_reset(db); */ //(to be determined)
 }
 
-static void SHOW_RESTART_SUM(struct board_info *db)
+static void SHOW_RESTART_SHOW_STATIISTIC(struct board_info *db)
 {
 	netif_warn(db, rx_status, db->ndev, "List: rxstatus_Er & rxlen_Er %d, RST_c %d\n",
 	   db->bc.status_err_counter + db->bc.large_err_counter,
@@ -451,12 +451,8 @@ static int dm9051_set_recv(struct board_info *db)
  */
 int dm9051_int_clkout(struct board_info *db)
 {
-	int ret;
-
 	netif_info(db, intr, db->ndev, "_reset [_core_reset] set DM9051_IPCOCR %02lx\n", IPCOCR_CLKOUT | IPCOCR_DUTY_LEN);
-	ret = regmap_write(db->regmap_dm, DM9051_IPCOCR, IPCOCR_CLKOUT | IPCOCR_DUTY_LEN);
-	if (ret)
-		return ret;
+	return regmap_write(db->regmap_dm, DM9051_IPCOCR, IPCOCR_CLKOUT | IPCOCR_DUTY_LEN);
 }
 
 static int dm9051_update_fcr(struct board_info *db)
@@ -1207,7 +1203,7 @@ static int dm9051_all_restart(struct board_info *db) //todo
 		return ret;
 
 	db->bc.fifo_rst_counter++;
-	SHOW_RESTART_SUM(db);
+	SHOW_RESTART_SHOW_STATIISTIC(db);
 	return 0;
 }
 
