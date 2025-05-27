@@ -1187,6 +1187,282 @@ static int dm9051_all_start(struct board_info *db)
 
 	return dm9051_core_reset(db);
 }
+int dump_regs(struct board_info *db)
+{
+	//get_regs
+	int i;
+	u8 buff[64-16];
+	int ret = dm9051_get_regs(db, 0, buff, sizeof(buff));
+	if (ret < 0)
+		return ret;
+
+	//i = 0;
+	for (i = 0; i < sizeof(buff); i += 16)
+		printk("%08x  %02x %02x %02x %02x %02x %02x %02x %02x  %02x %02x %02x %02x %02x %02x %02x %02x\n", i,
+			buff[i], buff[i+1], buff[i+2], buff[i+3],
+			buff[i+4], buff[i+5], buff[i+6], buff[i+7],
+			buff[i+8], buff[i+9], buff[i+10], buff[i+11],
+			buff[i+12], buff[i+13], buff[i+14], buff[i+15]
+			);
+
+	return 0;
+}
+static int dm9051_single_tx(struct board_info *db, u8 *p);
+static int dm9051_req_tx(struct board_info *db);
+static int rx_break(struct board_info *db, unsigned int rxbyte, netdev_features_t features);
+static int trap_rxb(struct board_info *db, unsigned int *prxbyte);
+static int trap_clr(struct board_info *db);
+static int rx_head_break(struct board_info *db);
+static int amdix_bmsr_change(struct board_info *db, unsigned int *val)
+{
+	static unsigned int bmsr = 0x0000; //0xffff;
+
+	int ret = dm9051_phyread(db, MII_LPA, val);
+	if (ret)
+		return ret;
+	db->lpa = *val;
+
+	ret = dm9051_phyread(db, MII_BMSR, val);
+	if (ret)
+		return ret;
+	db->bmsr = *val;
+
+	if (db->bmsr != bmsr) {
+		bmsr = db->bmsr;
+		return 1;
+	}
+	return 0;
+}
+static void dm9051_phyread_bmsr_loop(struct board_info *db, unsigned int reg, unsigned int *val) //reg, not used!
+{
+	int i = 0;
+	while (1) {
+		while (amdix_bmsr_change(db, val))
+			;
+
+		//while (!amdix_bmsr_change(db)) {		
+		//}
+		if (db->bmsr & BIT(2)) {
+			netif_warn(db, link, db->ndev, "<fund_phylib. rd.bmsr %04x [lpa] %04x> DONE...\n",
+						db->bmsr, db->lpa);
+			break;
+		}
+
+		msleep(1);
+		if (i++ > 1000) {
+			netif_warn(db, link, db->ndev, "<fund_phylib. rd.bmsr %04x [lpa] %04x> TimeOut...\n",
+						db->bmsr, db->lpa);
+			break;
+		}
+	}
+
+	//return ret;	
+}
+void dump_data_001(struct board_info *db, u8 *packet_data, int packet_len) //.dm9051_dump_data1
+{
+	int i, j, rowsize = 32;
+	int splen; //index of start row
+	int rlen; //remain/row length 
+	char line[120];
+	
+	//rlen = packet_len > 16 ? 16 : packet_len;
+
+	netif_info(db, pktdata, db->ndev, "%s\n", db->bc.head);
+	for (i = 0; i < packet_len; i += rlen) {
+		//rlen = print_line(packet_data+i, min(rowsize, skb->len - i)); ...
+		rlen =  packet_len - i;
+		if (rlen >= rowsize) rlen = rowsize;
+
+		splen = 0;
+		splen += sprintf(line + splen, "%03d", i);
+		for (j = 0; j < rlen; j++) {
+			if (!(j % 8)) splen += sprintf(line + splen, " ");
+			if (!(j % 16)) splen += sprintf(line + splen, " ");
+			splen += sprintf(line + splen, " %02x", packet_data[i+j]);
+		}
+		netif_info(db, pktdata, db->ndev, "%s\n", line);
+	}
+}
+
+int dm9051_single_rx(struct board_info *db)
+{
+	struct net_device *ndev = db->ndev;
+	int ret, rxlen, padlen;
+	unsigned int rxbyte;
+	u8 buf[4 + 128];
+	
+	ret = dm9051_read_mem_rxb(db, DM_SPI_MRCMDX, &rxbyte, 2);
+	if (ret)
+		return ret;
+
+	if (rx_break(db, rxbyte, ndev->features))
+	{
+		if (trap_rxb(db, &rxbyte)) {
+			DMPLUG_LOG_RXPTR("rxb last", db);
+			//dm9051_all_restart(db);
+			printk("One rx error found!\n");
+			return -EINVAL;
+		}
+		//break;
+		printk("Once rx NO data~\n");
+		//return -EINVAL;
+		return 0;
+	}
+	trap_clr(db);
+
+	ret = dm9051_read_mem(db, DM_SPI_MRCMD, &db->rxhdr, DM_RXHDR_SIZE);
+	if (ret)
+		return ret;
+
+	/* rx_head_takelen check */
+	ret = rx_head_break(db);
+	if (ret) {
+		//dm9051_all_restart(db);
+		printk("One rx_head error found!\n");
+		return -EINVAL;
+	}
+
+	rxlen = le16_to_cpu(db->rxhdr.rxlen);
+	padlen = (plat_cnf->skb_wb_mode && (rxlen & 1)) ? rxlen + 1 : rxlen;
+	printk("recv rx %d bytes\n", rxlen);
+
+	ret = dm9051_read_mem_cache(db, DM_SPI_MRCMD, buf, padlen);
+	if (ret)
+	{
+		return ret;
+	}
+
+	//SHOW_ptp_rx_packet_monitor(db, skb);
+	sprintf(db->bc.head, "dump rx-len %d", rxlen);
+	dump_data_001(db, buf, rxlen);
+	return 0;
+}
+
+int test_loop_back(struct board_info *db)
+{
+	int ret;
+	unsigned int val;
+	u8 buf[4 + 64] = {0,0,0,0, 1,2,3,4,5,6,7,8,9,10, };
+
+	printk("test_loop_back\n");
+	msleep(1);
+	SHOW_BMSR(db);
+	SHOW_BMSR(db);
+
+	printk("set_loop_back\n");
+
+#if 0
+	//ret = dm9051_set_reg(db, DM9051_NCR, 0x0A);
+	//ret = dm9051_set_reg(db, DM9051_NCR, 0x02);
+	
+	ret = dm9051_set_reg(db, DM9051_NCR, 0x04);
+	if (ret)
+		return ret;
+#endif
+	dm9051_phyread_bmsr_loop(db, MII_BMSR, &val);
+	netif_warn(db, link, db->ndev, "<dm9051_phyread_bmsr_loop rd.bmsr %04x [lpa] %04x> End...\n",
+				db->bmsr, db->lpa);
+
+	msleep(1);
+	SHOW_BMSR(db);
+	SHOW_BMSR(db);
+	
+	//SENDC
+#if 0
+//	printk("send_bytes 10\n"); //dm9.Monitor
+//buf[0] = 0x01;
+//buf[1] = 0x40;
+//buf[2] = 0x0a;
+//buf[3] = 0x00;
+//	db->pad = 0;
+//	db->data_len = 10;
+//	ret = dm9051_single_tx(db, buf);
+//	if (ret)
+//		return ret;
+
+//	db->tcr_wr = TCR_TXREQ; //pre-defined
+//	ret = dm9051_req_tx(db);
+//	if (ret)
+//		return ret;
+
+//	printk("poll nsr\n");
+//	ret = dm9051_nsr_poll(db);
+//	if (ret)
+//		return ret;
+
+//	dump_regs(db);
+#endif
+	
+	//SENDC
+#if 1
+	printk("send_bytes 64\n");
+buf[0] = 0x01;
+buf[1] = 0x40;
+buf[2] = 0x40;
+buf[3] = 0x00;
+	db->pad = 0;
+	db->data_len = 64;
+	ret = dm9051_single_tx(db, buf);
+	if (ret)
+		return ret;
+
+	db->tcr_wr = TCR_TXREQ; //pre-defined
+	ret = dm9051_req_tx(db);
+	if (ret)
+		return ret;
+
+	printk("poll nsr\n");
+	ret = dm9051_nsr_poll(db);
+	if (ret)
+		return ret;
+
+	dump_regs(db);
+#endif
+	
+	//SENDC
+#if 1
+	printk("send_bytes 66\n");
+buf[0] = 0x01;
+buf[1] = 0x40;
+buf[2] = 0x42;
+buf[3] = 0x00;
+	db->pad = 0;
+	db->data_len = 66;
+	ret = dm9051_single_tx(db, buf);
+	if (ret)
+		return ret;
+
+	db->tcr_wr = TCR_TXREQ; //pre-defined
+	ret = dm9051_req_tx(db);
+	if (ret)
+		return ret;
+
+	printk("poll nsr\n");
+	ret = dm9051_nsr_poll(db);
+	if (ret)
+		return ret;
+
+	dump_regs(db);
+#endif
+	
+	//printk("recv rx %u bytes\n", rx_len);
+	printk("dm9051_single_rx(db).1\n");
+	ret = dm9051_single_rx(db);
+	if (ret)
+		return ret;
+	dump_regs(db);
+	printk("\n");
+
+	//printk("recv rx %u bytes\n", rx_len);
+	printk("dm9051_single_rx(db).2\n");
+	ret = dm9051_single_rx(db);
+	if (ret)
+		return ret;
+	dump_regs(db);
+	printk("\n");
+
+	return 0;
+}
 
 static int dm9051_all_stop(struct board_info *db)
 {
@@ -1219,6 +1495,13 @@ static int dm9051_all_start_mlock(struct board_info *db)
 	#if MI_FIX
 	mutex_lock(&db->spi_lockm); //.open
 	#endif
+
+#if 1
+ret = dm9051_all_start(db);
+if (ret)
+	return ret;
+test_loop_back(db);
+#endif
 
 	ret = dm9051_all_start(db);
 	if (ret)
