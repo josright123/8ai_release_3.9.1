@@ -1139,6 +1139,32 @@ static const struct ethtool_ops dm9051_ethtool_ops = { //const struct ethtool_op
 	DMPLUG_PTP_INFO(.get_ts_info) //_15888_
 };
 
+/* all reinit while rx error found
+ */
+//int dm9051_all_reinit(struct board_info *db)
+//{
+//	int ret;
+
+////	mutex_unlock(&db->spi_lockm);
+////	phy_stop(db->phydev);
+////	mutex_lock(&db->spi_lockm);
+
+//	ret = _dm9051_core_reset(db);
+//	if (ret)
+//		return ret;
+
+////	mutex_unlock(&db->spi_lockm);
+////	phy_start(db->phydev);
+////	phy_start_aneg(db->phydev);
+////	mutex_lock(&db->spi_lockm);
+
+//	ret = dm9051_all_start_intr(db);
+//	if (ret)
+//		return ret;
+
+//	return dm9051_subconcl_and_rerxctrl(db);
+//}
+
 static int dm9051_all_start(struct board_info *db)
 {
 	int ret;
@@ -1208,9 +1234,20 @@ static int dm9051_all_restart(struct board_info *db) //todo
 	if (ret)
 		return ret;
 
-	ret = dm9051_all_reinit(db); //head_restart
-	if (ret)
-		return ret;
+	//=	ret = dm9051_all_reinit(db); //up_restart
+	#if 1		
+		ret = dm9051_core_reset(db);
+		if (ret)
+			return ret;
+
+		ret = dm9051_all_start_intr(db);
+		if (ret)
+			return ret;
+
+		ret = dm9051_subconcl_and_rerxctrl(db);
+		if (ret)
+			return ret;
+	#endif
 
 	db->bc.fifo_rst_counter++;
 	SHOW_RESTART_SHOW_STATIISTIC(db);
@@ -1225,43 +1262,22 @@ int dm9051_all_upfcr(struct board_info *db)
 	netif_crit(db, link, db->ndev, "So does (all_start(open), all_upstart(link_chg), all_restart(err_fnd)) not applied!\n");
 	return dm9051_update_fcr(db);
 }
-//#ifdef DMCONF_MRR_WR
-//int dm9051_all_upstart001(struct board_info *db) //todo
-//{
-//	int ret;
 
-//	printk("_all_upstart\n"); //NOT .netif_crit();
-
-//	ret = dm9051_ncr_reset(db);
-//	if (ret)
-//		return ret;
-
-//	ret = dm9051_all_reinit(db); //up_restart
-//	if (ret)
-//		return ret;
-
-//	return 0;
-//}
-//#endif //DMCONF_MRR_WR
 int dm9051_all_upstart(struct board_info *db)
 {
 	int ret;
 
-	//int ret = dm9051_all_upstart(db);
-	//if (ret)
-	//	goto dnf_end;
 	printk("_all_upstart\n"); //NOT to .netif_crit(db, rx_err, db->ndev, "_all_upstart\n");
 	do {
 		int ret = dm9051_ncr_reset(db);
 		if (ret)
 			goto dnf_end;
 		
-	//=	ret = dm9051_all_reinit(db); //up_restart
+	//ret = dm9051_all_reinit(db); //up_restart
 	#if 1		
 		ret = dm9051_core_reset(db);
 		if (ret)
 			goto dnf_end;
-	#endif
 
 		ret = dm9051_all_start_intr(db);
 		if (ret)
@@ -1270,37 +1286,12 @@ int dm9051_all_upstart(struct board_info *db)
 		ret = dm9051_subconcl_and_rerxctrl(db);
 		if (ret)
 			goto dnf_end;
+	#endif
 	} while(0);
 	ret = dm9051_update_fcr(db);
 dnf_end:
 	netif_crit(db, rx_err, db->ndev, "DMCONF_MRR_WR operation done!\n");
 	return ret;
-}
-
-/* all reinit while rx error found
- */
-int dm9051_all_reinit(struct board_info *db)
-{
-	int ret;
-
-//	mutex_unlock(&db->spi_lockm);
-//	phy_stop(db->phydev);
-//	mutex_lock(&db->spi_lockm);
-
-	ret = dm9051_core_reset(db);
-	if (ret)
-		return ret;
-
-//	mutex_unlock(&db->spi_lockm);
-//	phy_start(db->phydev);
-//	phy_start_aneg(db->phydev);
-//	mutex_lock(&db->spi_lockm);
-
-	ret = dm9051_all_start_intr(db);
-	if (ret)
-		return ret;
-
-	return dm9051_subconcl_and_rerxctrl(db);
 }
 
 int dm9051_subconcl_and_rerxctrl(struct board_info *db)
@@ -2247,19 +2238,6 @@ static void DM9051_PROBE_DLYSETUP(struct board_info *db)
 	#endif
 }
 
-static void FCR_UPSTART_MRR_WR(struct board_info *db)
-{
-	#if MI_FIX
-	mutex_lock(&db->spi_lockm);
-	#endif
-	
-	LINKCHG_UPSTART(db);
-
-	#if MI_FIX
-	mutex_unlock(&db->spi_lockm);
-	#endif
-}
-
 static void dm9051_operation_clear(struct board_info *db)
 {
 	db->bc.status_err_counter = 0;
@@ -2317,6 +2295,19 @@ static int dm9051_mdio_register(struct board_info *db)
 	return ret;
 }
 
+//static void FCR_UPSTART_MRR_WR(struct board_info *db)
+//{
+//	#if MI_FIX
+//	mutex_lock(&db->spi_lockm);
+//	#endif
+//	
+//	_LINKCHG_UPSTART(db);
+
+//	#if MI_FIX
+//	mutex_unlock(&db->spi_lockm);
+//	#endif
+//}
+
 static void dm9051_handle_link_change(struct net_device *ndev)
 {
 	struct board_info *db = to_dm9051_board(ndev);
@@ -2338,7 +2329,16 @@ static void dm9051_handle_link_change(struct net_device *ndev)
 			db->pause.rx_pause = true;
 			db->pause.tx_pause = true;
 		}
-		FCR_UPSTART_MRR_WR(db);
+
+		#if MI_FIX
+		mutex_lock(&db->spi_lockm);
+		#endif
+		
+		LINKCHG_UPSTART(db);
+
+		#if MI_FIX
+		mutex_unlock(&db->spi_lockm);
+		#endif
 
 		printk("UNLOCK_MUTEX\n");
 		printk("\n");

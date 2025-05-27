@@ -596,7 +596,7 @@ int dm9051_write_mem(struct board_info *db, unsigned int reg, const void *buff,
 int dm9051_write_mem_cache(struct board_info *db, u8 *buff, unsigned int crlen);
 
 /* init functions */
-int dm9051_all_reinit(struct board_info *db);
+//int dm9051_all_reinit(struct board_info *db);
 int dm9051_subconcl_and_rerxctrl(struct board_info *db);
 
 /* operation functions */
