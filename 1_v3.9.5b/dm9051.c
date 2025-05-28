@@ -1362,7 +1362,7 @@ int dm9051_single_rx(struct board_info *db)
 	db->bc.nRxcF++;
 	printk("\n");
 #ifdef DMPLUG_PTP
-	if (db->ptp_enable && is_ptp_rxts_enable(db))
+	if (db->ph.ptp_enable && is_ptp_rxts_enable(db))
 		printk("recv packet %d, rx tstamp %d bytes and %d bytes\n", db->bc.nRxcF, 8, rxlen);
 	else
 #endif
@@ -1376,10 +1376,10 @@ int dm9051_single_rx(struct board_info *db)
 
 	//SHOW_ptp_rx_packet_monitor(db, skb);
 #ifdef DMPLUG_PTP
-	if (db->ptp_enable) {
+	if (db->ph.ptp_enable) {
 	if (is_ptp_rxts_enable(db)) {	// Inserted Timestamp
 		sprintf(db->bc.head, "dump rx-tstamp %d", 8);
-		dump_data_001(db, db->rxTSbyte, 8);
+		dump_data_001(db, db->ph.rxTSbyte, 8);
 	}}
 #endif
 	

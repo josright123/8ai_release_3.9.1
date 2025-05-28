@@ -71,7 +71,7 @@
 #warning "INT: TWO_STEP"
 #endif
 
-//#define PLUG_PTP_1588
+#define PLUG_PTP_1588
 #ifdef PLUG_PTP_1588
 #define DMPLUG_PTP //(ptp 1588)
 
@@ -562,20 +562,9 @@ struct board_info
 	unsigned int mdi; //= 0x0830;
 
 	/* 1 ptpc */
-	//#ifdef DMPLUG_PTP
-	int			ptp_enable;
-	struct ptp_clock        *ptp_clock;
-	struct ptp_clock_info 	ptp_caps;
-
-	int			ptp_on; //_15888_
-
-	u8			ptp_step; //dividual
-	u8			_ptp_rsrv; //ptp_packet; //dividual
-
-	struct hwtstamp_config	tstamp_config;
-	s64			pre_rate;
-	u8              	rxTSbyte[8]; //_15888_ // Store 1588 Time Stamp
-	//#endif
+	#ifdef DMPLUG_PTP
+	struct dm9051_ptp_hdr ph;
+	#endif
 };
 
 //#define TOGG_INTVL	1

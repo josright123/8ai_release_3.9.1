@@ -136,6 +136,7 @@ int dm9051_ptp_tx_in_progress(struct sk_buff *skb)
 
 void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb)
 {
+	struct dm9051_ptp_hdr *ph = &db->ph;
 	struct ptp_header *ptp_hdr;
 
 	db->tcr_wr = TCR_TXREQ; // TCR register value
@@ -148,8 +149,8 @@ void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb)
 			//if (dm9051_ptp_frame(db, skb)) {
 				//if (likely(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP)) {
 				if (is_ptp_sync_packet(message_type)) {
-					db->ptp_step = (u8)(ptp_hdr->flag_field[0] & PTP_FLAG_TWOSTEP) ? PTP_TWO_STEP : PTP_ONE_STEP;
-					if (db->ptp_step == 2) {
+					ph->ptp_step = (u8)(ptp_hdr->flag_field[0] & PTP_FLAG_TWOSTEP) ? PTP_TWO_STEP : PTP_ONE_STEP;
+					if (ph->ptp_step == 2) {
 						db->tcr_wr = TCR_TS_EN | TCR_TXREQ;
 					} else {
 						db->tcr_wr = TCR_TS_EMIT | TCR_TXREQ;
@@ -165,6 +166,7 @@ void dm9051_ptp_txreq(struct board_info *db, struct sk_buff *skb)
 
 void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 {
+	struct dm9051_ptp_hdr *ph = &db->ph;
 	struct ptp_header *ptp_hdr = get_ptp_header(skb);
 	if (ptp_hdr) //is_ptp_packet(skb->data)
 	{
@@ -176,7 +178,7 @@ void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 		
 		if (is_ptp_sync_packet(message_type)) {
 			if (slave_get_ptpFrame)
-			if (db->ptp_enable) {
+			if (ph->ptp_enable) {
 			if (db->rxhdr.status & RSR_RXTS_EN) {	// Inserted Timestamp
 				printk("\n");
 				printk("Slave(%d)-get-sync with tstamp. \n", --slave_get_ptpFrame);
@@ -188,7 +190,7 @@ void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 		} else
 		if (message_type == PTP_MSGTYPE_FOLLOW_UP) {
 			if (slave_get_ptpFrame)
-			if (db->ptp_enable) {
+			if (ph->ptp_enable) {
 			if (db->rxhdr.status & RSR_RXTS_EN) {	// Inserted Timestamp
 				printk("Slave(%d)-get-followup with tstamp. \n", --slave_get_ptpFrame);
 			} else {
@@ -197,7 +199,7 @@ void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 		} else
 		if (message_type == PTP_MSGTYPE_DELAY_RESP) {
 			if (slave_get_ptpFrameResp3)
-			if (db->ptp_enable) {
+			if (ph->ptp_enable) {
 			if (db->rxhdr.status & RSR_RXTS_EN) {	// Inserted Timestamp
 				printk("Slave(%d)-get-DELAY_RESP with tstamp. \n", --slave_get_ptpFrameResp3);
 			} else {
@@ -206,7 +208,7 @@ void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 		} else
 		if (message_type == PTP_MSGTYPE_ANNOUNCE) {
 			if (slave_get_ptpFrame)
-			if (db->ptp_enable) {
+			if (ph->ptp_enable) {
 			if (db->rxhdr.status & RSR_RXTS_EN) {	// Inserted Timestamp
 				printk("Slave(%d)-get-ANNOUNCE with tstamp. \n", --slave_get_ptpFrame);
 			} else {
@@ -214,7 +216,7 @@ void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 			}}
 		} else
 		if (is_ptp_delayreq_packet(message_type)) {
-			if (db->ptp_enable) {
+			if (ph->ptp_enable) {
 			if (db->rxhdr.status & RSR_RXTS_EN) {	// Inserted Timestamp
 				if (master_get_delayReq6) {
 					printk("Master(%d)-get-DELAY_REQ with tstamp. \n", --master_get_delayReq6);
@@ -225,7 +227,7 @@ void dm9051_ptp_rx_packet_monitor(struct board_info *db, struct sk_buff *skb)
 		} else
 		{
 			if (slave_get_ptpMisc)
-			if (db->ptp_enable) {
+			if (ph->ptp_enable) {
 			if (db->rxhdr.status & RSR_RXTS_EN) {	// Inserted Timestamp
 				printk("Slave(%d) or Master get-knonw with tstamp. \n", --slave_get_ptpMisc);
 			} else {
@@ -250,7 +252,9 @@ void dm9051_ptp_rxc_from_master(struct board_info *db)
 static int lan_ptp_get_ts_ioctl(struct net_device *netdev, struct ifreq *ifr)
 {
 	struct board_info *adb = netdev_priv(netdev);
-	struct hwtstamp_config *config = &adb->tstamp_config;
+	struct dm9051_ptp_hdr *ph = &adb->ph;
+
+	struct hwtstamp_config *config = &ph->tstamp_config;
         
 	/* copy from db tstamp_config, to user */
 	return copy_to_user(ifr->ifr_data, config, sizeof(*config)) ?
@@ -260,6 +264,7 @@ static int lan_ptp_get_ts_ioctl(struct net_device *netdev, struct ifreq *ifr)
 static int lan743x_ptp_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 {
 	struct board_info *adb = netdev_priv(netdev);
+	struct dm9051_ptp_hdr *ph = &adb->ph;
 	struct hwtstamp_config config;
 	int ret = 0;
 
@@ -281,27 +286,27 @@ static int lan743x_ptp_ioctl(struct net_device *netdev, struct ifreq *ifr, int c
 	switch (config.tx_type) {
 		case HWTSTAMP_TX_OFF:
 			//dev_info(&adb->spidev->dev, "IOCtl - Now db->ptp_on %d, _ptp_set_sync_ts_insert(adapter, false)\n", adb->ptp_on);
-			netif_info(adb, hw, adb->ndev, "IOCtl - Now db->ptp_on %d, NOTE: Stop tx sync !\n", adb->ptp_on);
+			netif_info(adb, hw, adb->ndev, "IOCtl - Now db->ptp_on %d, NOTE: Stop tx sync !\n", ph->ptp_on);
 			//lan743x_ptp_set_sync_ts_insert(adapter, false);
 			break;
 		case HWTSTAMP_TX_ONESTEP_SYNC:
 	//.		db->ptp_onestep = true;
-			adb->ptp_on = 1;
+			ph->ptp_on = 1;
 			//dev_info(&adb->spidev->dev, "IOCtl - Set db->ptp_on %d, _ptp_set_sync_ts_insert(adapter, true)\n", adb->ptp_on);
-			netif_info(adb, hw, adb->ndev, "IOCtl: Set db->ptp_on %d, _ptp_set_sync_ts_insert(adapter, true)\n", adb->ptp_on);
+			netif_info(adb, hw, adb->ndev, "IOCtl: Set db->ptp_on %d, _ptp_set_sync_ts_insert(adapter, true)\n", ph->ptp_on);
 			//gem_ptp_set_one_step_sync(bp, 1);
 			//lan743x_ptp_set_sync_ts_insert(adapter, true);
 			break;
 		case HWTSTAMP_TX_ON:
 	//.		db->ptp_onestep = false;
-			adb->ptp_on = 1;
-			netif_info(adb, hw, adb->ndev, "IOCtl - Set db->ptp_on %d, _ptp_set_sync_ts_insert(adapter, false)\n", adb->ptp_on);
+			ph->ptp_on = 1;
+			netif_info(adb, hw, adb->ndev, "IOCtl - Set db->ptp_on %d, _ptp_set_sync_ts_insert(adapter, false)\n", ph->ptp_on);
 			//gem_ptp_set_one_step_sync(bp, 0);
 			//lan743x_ptp_set_sync_ts_insert(adapter, false);
 			break;
 		case HWTSTAMP_TX_ONESTEP_P2P:
 			//ret = -ERANGE;
-			netif_warn(adb, hw, adb->ndev, "IOCtl - Now db->ptp_on %d, Error Range!\n", adb->ptp_on);
+			netif_warn(adb, hw, adb->ndev, "IOCtl - Now db->ptp_on %d, Error Range!\n", ph->ptp_on);
 			return -ERANGE;
 			//break;
 		default:
@@ -380,8 +385,8 @@ static int lan743x_ptp_ioctl(struct net_device *netdev, struct ifreq *ifr, int c
 
 	if (!ret) {
 		/* copy to db tstamp_config */
-		memcpy(&adb->tstamp_config, &config,
-		       sizeof(adb->tstamp_config));
+		memcpy(&ph->tstamp_config, &config,
+		       sizeof(ph->tstamp_config));
 
 		/* copy to user */
 		return copy_to_user(ifr->ifr_data, &config,
@@ -400,10 +405,11 @@ int dm9051_ts_info(struct net_device *net_dev, struct ethtool_ts_info *info)
 #endif
 {
 	struct board_info *db = netdev_priv(net_dev);
+	struct dm9051_ptp_hdr *ph = &db->ph;
 	
 //Spenser - get phc_index	
 	//info->phc_index = -1;
-	info->phc_index = db->ptp_clock ? ptp_clock_index(db->ptp_clock) : -1;
+	info->phc_index = ph->ptp_clock ? ptp_clock_index(ph->ptp_clock) : -1;
 
 
 	info->so_timestamping =
@@ -468,13 +474,17 @@ int dm9051_ptp_netdev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 
 /* APIs */
 void ptp_ver(struct board_info *db) {
-	if (db->ptp_enable) {
+	struct dm9051_ptp_hdr *ph = &db->ph;
+
+	if (ph->ptp_enable) {
 		dev_info(&db->spidev->dev, "DMPLUG PTP Version\n");
 		dev_info(&db->spidev->dev, "Enable PTP must COERCE to disable checksum_offload\n");
 	}
 }
 int ptp_new(struct board_info *db) {
-	db->ptp_enable = 1; // Enable PTP - For the driver whole operations
+	struct dm9051_ptp_hdr *ph = &db->ph;
+
+	ph->ptp_enable = 1; // Enable PTP - For the driver whole operations
 	return 1;
 }
 void ptp_init_rcr(struct board_info *db) {

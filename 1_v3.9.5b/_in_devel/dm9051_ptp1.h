@@ -95,6 +95,24 @@ enum ptp_sync_type {
     PTP_TWO_STEP = 2,     /* Two-step sync message */
 };
 
+//#ifdef DMPLUG_PTP
+struct dm9051_ptp_hdr
+{
+	int			ptp_enable;
+	struct ptp_clock        *ptp_clock;
+	struct ptp_clock_info 	ptp_caps;
+
+	int			ptp_on; //_15888_
+
+	u8			ptp_step; //dividual
+	u8			_ptp_rsrv; //ptp_packet; //dividual
+
+	struct hwtstamp_config	tstamp_config;
+	s64			pre_rate;
+	u8              	rxTSbyte[8]; //_15888_ // Store 1588 Time Stamp
+};
+//#endif
+
 /* ethtool_ops
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0)
