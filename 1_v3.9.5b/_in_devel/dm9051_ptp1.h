@@ -5,8 +5,7 @@
  */
 #ifndef _DM9051_PTPC_H_
 #define _DM9051_PTPC_H_
-
-#ifdef DMPLUG_PTP
+//#ifdef DMPLUG_PTP
 struct board_info;
 /*
  * ptp 1588: 
@@ -170,6 +169,5 @@ void dm9051_ptp_txreq_hwtstamp(struct board_info *db, struct sk_buff *skb);
 #undef DMPLUG_TX_EMIT_TS
 #define DMPLUG_TX_EMIT_TS(b,s)	dm9051_ptp_txreq_hwtstamp(b,s)
 #endif
-#endif
-
+//#endif
 #endif //_DM9051_PTPC_H_
