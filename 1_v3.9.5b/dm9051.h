@@ -144,7 +144,7 @@
 #define DMPLUG_TX_EMIT_TS(b,s)
 
 #if defined(DMPLUG_PTP)
-#include "_in_devel/dm9051_ptp1.h" /* 0.1 ptpc */
+#include "extern/dm9051_ptp1.h" /* 0.1 ptpc */
 #endif
 
 //#if (defined(__x86_64__) || defined(__aarch64__))
